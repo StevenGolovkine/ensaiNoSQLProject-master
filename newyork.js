@@ -2,17 +2,21 @@
 // Steven Golovkine
 // Process, query and display the data
 
+// The name of the MongoDB database which is used
 use Test;
 
+// Count all the crimes by borough and create the collection Borough
 db.Crimes.aggregate([
     { $group: { _id : "$BORO_NM", Total_Crimes : { $sum: 1 } } },
     { $out: "Borough" }
 ]);
 
+// Count all the ccrimes by precinct and by borough
 var precinctCrime = db.Crimes.aggregate([
     { $group: { _id : {Borough: "$BORO_NM", Precinct: "$ADDR_PCT_CD"} , Total_Crimes: {$sum: 1} } }
 ]);
 
+// Add the precinct to the Borough collection
 precinctCrime.forEach(function (x) {
     db.Borough.update(
                     {_id: x._id.Borough},
@@ -24,8 +28,10 @@ precinctCrime.forEach(function (x) {
                );
 });
 
+// Find the number of habitants in each borough in 2010
 var pop_borough = db.Population.find({}, {"BOROUGH":1, "2010 POPULATION":1, _id:0});
 
+// Add the population number in the Borough collection
 pop_borough.forEach(
             function (x){
                 db.Borough.update(
@@ -35,11 +41,12 @@ pop_borough.forEach(
             }
         );
 
-
+// Count the number of hotspots in each borough
 var hotspotNumber = db.Wifi.aggregate([
     { $group: { _id : "$BORO", Hotspot_Number: {$sum: 1} } }
 ]);
     
+// Add the number of hotspots in each borough in the Borough collection
 hotspotNumber.forEach(function (x) {
     db.Borough.update(
                     {_id: x._id},
@@ -47,8 +54,10 @@ hotspotNumber.forEach(function (x) {
                );
 });
 
+// Remove from the Borough collection the null id
 db.getCollection('Borough').remove( { _id: "" } )
 
+// Convert some data into integer
 db.getCollection('Borough').find({}).forEach(
     function(obj) {
         obj.Total_Crimes = new NumberInt(obj.Total_Crimes);
@@ -61,6 +70,7 @@ db.getCollection('Borough').find({}).forEach(
         db.Borough.save(obj);
     });
     
+// Display the borough with the lowest crime rate
 db.getCollection('Borough').aggregate([
     { $project: {_id: 1, crime_rate: {$divide: ["$Total_Crimes", "$Total_Population"] } } },
     { $sort: { "crime_rate" : 1 } },
@@ -70,7 +80,8 @@ db.getCollection('Borough').aggregate([
         print("The borough with the lowest crime rate is", obj._id, ". The crime rate is", obj.crime_rate, ".");
     }
 );
-    
+
+// Display the precinct in the Queens which have the lowerst number of crime
 db.getCollection('Borough').find({_id: "QUEENS"}).forEach(
     function (obj) {
         var crime = 100000;
@@ -85,6 +96,7 @@ db.getCollection('Borough').find({_id: "QUEENS"}).forEach(
     }
 );
 
+// Display the number of hotspots in every borough
 db.getCollection('Borough').aggregate([
     { $project: {_id: 1, Hotspot_Number: 1} },
     { $sort: { "Hotspot_Number" : -1 } },
@@ -93,7 +105,8 @@ db.getCollection('Borough').aggregate([
         print("The borough", obj._id, "has", obj.Hotspot_Number, "free hotspot Wi-fi.");
     }
 );
-    
+
+// Display the hotspots in the 100th precinct by type.
 var hotspot = db.getCollection('Wifi').aggregate( [
     {
         $match: {
@@ -111,6 +124,7 @@ var hotspot = db.getCollection('Wifi').aggregate( [
 print("There are", (hotspot[0].count + hotspot[1].count), "hotspot Wi-fi in the 100th precinct but there are only", hotspot[1].count, "which are really free.");
 
 
+// Display the location of the free hotspots in the 100th precinct
 var hotspot_location = db.getCollection('Wifi').aggregate( [
     {
         $match: {
